@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login / Sign Up — Hylodia Games</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+    --bg: #050810;
+    --bg-soft: #09101c;
+    --surface: rgba(13, 21, 35, 0.72);
+    --surface-strong: rgba(17, 27, 44, 0.88);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-hover: rgba(96, 165, 250, 0.35);
+    --text: #f5f7fb;
+    --muted: #8b98aa;
+    --blue: #3b82f6;
+    --blue-light: #60a5fa;
+    --blue-soft: rgba(59, 130, 246, 0.15);
+    --shadow: rgba(0, 0, 0, 0.45);
+    --grid: rgba(255, 255, 255, 0.045);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+    font-family: "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:-3;
+    background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.85) 35%, rgba(0,0,0,.35) 75%, transparent 100%);
+}
+
+body::after {
+    content:""; position:fixed; width:650px; height:650px; top:-280px; right:-220px;
+    border-radius:50%; background: rgba(37,99,235,.13); filter: blur(100px);
+    pointer-events:none; z-index:-2;
+}
+
+.ambient {
+    position:fixed; width:500px; height:500px; left:-250px; bottom:-250px;
+    border-radius:50%; background: rgba(59,130,246,.09); filter: blur(100px);
+    pointer-events:none; z-index:-2;
+}
+
+.brand-link {
+    position: fixed; top: 26px; left: 30px;
+    display: flex; align-items: center; gap: 10px;
+    text-decoration: none; color: var(--text);
+    font-weight: 800; font-size: 15px;
+    z-index: 5;
+}
+.brand-mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; color: #fff; font-size: 15px;
+    box-shadow: 0 8px 22px rgba(59,130,246,.28);
+}
+
+.auth-card {
+    width: min(430px, 100%);
+    background: rgba(13, 21, 35, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 24px;
+    padding: 34px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 40px rgba(59,130,246,.08);
+    animation: cardIn .5s cubic-bezier(.16,1,.3,1) both;
+    position: relative;
+}
+@keyframes cardIn { from { opacity:0; transform: translateY(22px) scale(.97); } to { opacity:1; transform: translateY(0) scale(1); } }
+
+.auth-header { text-align:center; margin-bottom: 22px; }
+.auth-logo {
+    width: 48px; height: 48px; margin: 0 auto 15px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius: 14px; background: linear-gradient(135deg,#3b82f6,#60a5fa);
+    color:#fff; font-size:20px; font-weight:800;
+    box-shadow: 0 10px 30px rgba(59,130,246,.2);
+}
+.auth-header h2 { margin:0 0 7px; font-size:24px; color:var(--text); }
+.auth-header p { margin:0; color:var(--muted); font-size:13px; }
+.brand-mark-img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+}
+
+.auth-logo-img {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 15px;
+    display: block;
+    object-fit: contain;
+}
+/* Premium segmented tab switcher */
+.auth-tabs {
+    position: relative;
+    display: flex;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: 4px;
+    margin-bottom: 24px;
+}
+.tab-indicator {
+    position: absolute; top: 4px; left: 4px;
+    width: calc(50% - 4px); height: calc(100% - 8px);
+    border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    box-shadow: 0 8px 22px rgba(59,130,246,.35);
+    transition: transform .35s cubic-bezier(.65,0,.35,1);
+    z-index: 1;
+}
+.tab-indicator.signup { transform: translateX(100%); }
+.auth-tab {
+    position: relative; z-index: 2; flex: 1;
+    padding: 10px 0; border: none; background: transparent;
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    color: var(--muted); cursor: pointer; border-radius: 10px;
+    transition: color .25s ease;
+}
+.auth-tab.active { color: #fff; }
+
+.auth-message { display:none; padding:10px 12px; margin-bottom:12px; border-radius:10px; font-size:13px; line-height:1.5; }
+.auth-message.show { display:block; }
+.auth-message.error { background: rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.18); color:#fca5a5; }
+.auth-message.success { background: rgba(34,197,94,.08); border:1px solid rgba(34,197,94,.18); color:#86efac; }
+
+.auth-form { display:flex; flex-direction:column; gap:14px; }
+.auth-field { display:flex; flex-direction:column; gap:7px; }
+.auth-field label { color:var(--text); font-size:13px; font-weight:600; }
+.auth-field input {
+    width:100%; box-sizing:border-box; padding:13px 14px;
+    border-radius:12px; border:1px solid rgba(255,255,255,.09);
+    background: rgba(255,255,255,.035); color:var(--text);
+    outline:none; font-family:inherit; font-size:14px; transition:.25s ease;
+}
+.auth-field input:focus { border-color: rgba(59,130,246,.7); box-shadow: 0 0 0 3px rgba(59,130,246,.08); }
+
+.auth-submit {
+    width:100%; padding:13px; margin-top:4px; border:none; border-radius:12px;
+    background:#3b82f6; color:#fff; font-family:inherit; font-size:14px; font-weight:700;
+    cursor:pointer; transition:.25s ease;
+}
+.auth-submit:hover { background:#2563eb; transform: translateY(-1px); box-shadow: 0 10px 25px rgba(59,130,246,.22); }
+.auth-submit:disabled { opacity:.7; cursor:default; transform:none; }
+
+.auth-divider { display:flex; align-items:center; gap:12px; margin:20px 0; color:var(--muted); font-size:12px; }
+.auth-divider::before, .auth-divider::after { content:""; height:1px; flex:1; background: rgba(255,255,255,.08); }
+.google-icon-img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+.google-btn {
+    width:100%; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.045); color:var(--text); font-family:inherit; font-size:14px; font-weight:600;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:.25s ease;
+}
+.google-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(59,130,246,.35); transform: translateY(-1px); }
+.google-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: .25s ease;
+}
+
+.google-btn img, 
+.google-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+    object-fit: contain;
+}
+.auth-footnote { text-align:center; margin-top: 22px; color: var(--muted); font-size: 12px; }
+.auth-footnote a { color: var(--blue-light); text-decoration: none; font-weight: 600; }
+
+@media (max-width: 480px) {
+    .auth-card { padding: 26px 22px; border-radius: 20px; }
+    .brand-link { top: 18px; left: 18px; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<a href="index.html" class="brand-link">
+    <img src="images/ChatGPT Image Sep 15, 2026, 11_19_40 AM.png" alt="Hylodia Logo" class="brand-mark-img">
+    Hylodia Games
+</a>
+
+<div class="auth-card">
+    <div class="auth-header">
+        <img src="images/ChatGPT Image Sep 15, 2026, 11_19_40 AM.png" alt="Hylodia Logo" class="auth-logo-img">
+        <h2 id="authTitle">Welcome Back</h2>
+        <p id="authSubtitle">Login to continue to Hylodia Games</p>
+    </div>
+
+    <div class="auth-tabs">
+        <div class="tab-indicator" id="tabIndicator"></div>
+        <button type="button" class="auth-tab active" id="tabLogin" onclick="setAuthMode('login')">Login</button>
+        <button type="button" class="auth-tab" id="tabSignup" onclick="setAuthMode('signup')">Sign Up</button>
+    </div>
+
+    <div class="auth-message" id="authMessage"></div>
+
+    <form class="auth-form" id="authForm" onsubmit="handleAuth(event)">
+        <div class="auth-field">
+            <label for="authEmail">Email</label>
+            <input type="email" id="authEmail" placeholder="you@example.com" required>
+        </div>
+        <div class="auth-field">
+            <label for="authPassword">Password</label>
+            <input type="password" id="authPassword" placeholder="••••••••" minlength="6" required>
+        </div>
+        <button type="submit" class="auth-submit" id="authSubmit">Login</button>
+    </form>
+
+    <div class="auth-divider">OR</div>
+
+    <button class="google-btn" type="button" onclick="loginWithGoogle()">
+    <img src="images/unnamed.png" alt="Google">
+    Continue with Google
+</button>
+    <div class="auth-footnote">
+        By continuing you agree to our <a href="terms-of-service.html">Terms of Service</a>.
+    </div>
+</div>
+
+<script>
+/* =========================
+   SUPABASE CONFIG
+========================= */
+const SUPABASE_URL = "https://ldwdtzwqybjdwbbdmnql.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_iCru3UduBGUT1WgC8m33lA_YVk5FhlC";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { detectSessionInUrl: true, persistSession: true }
+});
+
+/* =========================
+   REDIRECT TARGET
+========================= */
+const params = new URLSearchParams(window.location.search);
+const redirectTarget = params.get("redirect") || "index.html";
+let authMode = params.get("mode") === "signup" ? "signup" : "login";
+
+/* =========================
+   TAB SWITCH (premium)
+========================= */
+function setAuthMode(mode) {
+    authMode = mode;
+
+    document.getElementById("tabLogin").classList.toggle("active", mode === "login");
+    document.getElementById("tabSignup").classList.toggle("active", mode === "signup");
+    document.getElementById("tabIndicator").classList.toggle("signup", mode === "signup");
+
+    const title = document.getElementById("authTitle");
+    const subtitle = document.getElementById("authSubtitle");
+    const submit = document.getElementById("authSubmit");
+
+    if (mode === "login") {
+        title.textContent = "Welcome Back";
+        subtitle.textContent = "Login to continue to Hylodia Games";
+        submit.textContent = "Login";
+    } else {
+        title.textContent = "Create Account";
+        subtitle.textContent = "Join Hylodia Games today";
+        submit.textContent = "Create Account";
+    }
+
+    clearAuthMessage();
+}
+
+/* =========================
+   EMAIL AUTH
+========================= */
+async function handleAuth(event) {
+    event.preventDefault();
+    clearAuthMessage();
+
+    const email = document.getElementById("authEmail").value.trim();
+    const password = document.getElementById("authPassword").value;
+    const submit = document.getElementById("authSubmit");
+
+    submit.disabled = true;
+    submit.textContent = "Please wait...";
+
+    try {
+        if (authMode === "login") {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+
+            showAuthMessage("Login successful! Redirecting...", "success");
+            setTimeout(() => { window.location.href = redirectTarget; }, 700);
+
+        } else {
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) throw error;
+
+            showAuthMessage("Account created successfully! Redirecting...", "success");
+            setTimeout(() => { window.location.href = redirectTarget; }, 1100);
+        }
+    } catch (error) {
+        showAuthMessage(error.message, "error");
+    } finally {
+        submit.disabled = false;
+        submit.textContent = authMode === "login" ? "Login" : "Create Account";
+    }
+}
+
+/* =========================
+   GOOGLE LOGIN
+========================= */
+async function loginWithGoogle() {
+    clearAuthMessage();
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + "/" + redirectTarget }
+    });
+    if (error) showAuthMessage(error.message, "error");
+}
+
+/* =========================
+   AUTH MESSAGE HELPERS
+========================= */
+function showAuthMessage(message, type = "error") {
+    const box = document.getElementById("authMessage");
+    box.textContent = message;
+    box.className = `auth-message show ${type}`;
+}
+function clearAuthMessage() {
+    const box = document.getElementById("authMessage");
+    box.textContent = "";
+    box.className = "auth-message";
+}
+
+/* =========================
+   IF ALREADY LOGGED IN, SKIP THIS PAGE
+========================= */
+(async function checkExistingSession() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.user) {
+        window.location.href = redirectTarget;
+    }
+})();
+
+/* Apply initial mode from ?mode= query param */
+setAuthMode(authMode);
+</script>
+</body>
+</html>

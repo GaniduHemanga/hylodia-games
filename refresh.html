@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Touch Sampling & Refresh Rate Tester — Hylodia Games</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --bg: #050810;
+    --bg-soft: #09101c;
+    --surface: rgba(13, 21, 35, 0.72);
+    --surface-strong: rgba(17, 27, 44, 0.88);
+    --border: rgba(255,255,255,0.09);
+
+    --text: #f5f7fb;
+    --muted: #8b98aa;
+
+    --blue: #3b82f6;
+    --blue-light: #60a5fa;
+    --blue-soft: rgba(59,130,246,0.15);
+
+    --shadow: rgba(0,0,0,0.35);
+    --grid: rgba(255,255,255,0.045);
+}
+
+.logo-img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+}
+
+.footer-logo-img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+    font-family: "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -3;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.85) 35%, rgba(0,0,0,.35) 75%, transparent 100%);
+}
+
+body::after {
+    content: ""; position: fixed; width: 650px; height: 650px; top: -280px; right: -220px;
+    border-radius: 50%; background: rgba(37,99,235,.13); filter: blur(100px); pointer-events: none; z-index: -2;
+}
+
+.ambient {
+    position: fixed; width: 500px; height: 500px; left: -250px; bottom: -250px;
+    border-radius: 50%; background: rgba(59,130,246,.09); filter: blur(100px); pointer-events: none; z-index: -2;
+}
+
+/* =========================
+   ICON SPRITE
+========================= */
+.icon-svg {
+    width: 1em;
+    height: 1em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -0.15em;
+    display: inline-block;
+}
+.icon-svg.filled { fill: currentColor; stroke: none; }
+
+/* =========================
+   TOAST NOTIFICATION
+========================= */
+.toast-stack {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 360px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(13, 21, 35, 0.92);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    box-shadow: 0 18px 45px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.02);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    pointer-events: auto;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform .4s cubic-bezier(.2,.8,.2,1), opacity .4s ease;
+}
+.toast.toast-in { transform: translateX(0); opacity: 1; }
+.toast.toast-out { transform: translateX(120%); opacity: 0; }
+.toast.toast-error { border-color: rgba(239, 68, 68, 0.3); }
+.toast.toast-info { border-color: rgba(96, 165, 250, 0.3); }
+.toast-icon {
+    width: 30px; height: 30px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    font-size: 15px;
+    display: grid; place-items: center;
+    background: rgba(34,197,94,.15);
+    color: #4ade80;
+}
+.toast.toast-error .toast-icon { background: rgba(239,68,68,.15); color: #f87171; }
+.toast.toast-info .toast-icon { background: rgba(59,130,246,.15); color: #60a5fa; }
+.toast-body strong { display: block; font-size: 13px; color: var(--text); }
+.toast-body span { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.toast-close {
+    margin-left: auto;
+    background: none; border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px;
+}
+.toast-close:hover { color: var(--text); }
+
+/* NAVBAR */
+.navbar {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%); width: min(1180px, calc(100% - 32px));
+    display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 12px 20px;
+    background: var(--surface); border: 1px solid var(--border); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-radius: 18px; box-shadow: 0 18px 60px var(--shadow); z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 11px; font-size: 17px; font-weight: 700; letter-spacing: -.4px; color: var(--text); text-decoration: none; }
+.nav-links { display: flex; align-items: center; gap: 7px; }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 9px 12px; border-radius: 10px; transition: .25s ease; }
+.nav-links a:hover { color: var(--text); background: var(--blue-soft); }
+.nav-actions { display: flex; align-items: center; gap: 8px; }
+.nav-btn { border: 1px solid var(--border); background: transparent; color: var(--text); padding: 9px 13px; border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: .25s ease; }
+.nav-btn:hover { background: var(--blue-soft); border-color: rgba(59,130,246,.25); }
+.signup { background: var(--blue); color: white; border-color: transparent; }
+.signup:hover { background: var(--blue-light); transform: translateY(-1px); }
+
+/* MOBILE MENU & HAMBURGER ANIMATION */
+.menu-toggle { display:none; width:42px; height:42px; border:1px solid rgba(96,165,250,.22); border-radius:12px; background:rgba(255,255,255,.045); color:var(--text); align-items:center; justify-content:center; flex-direction:column; gap:4px; cursor:pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.menu-toggle span { display:block; width:18px; height:2px; border-radius:99px; background:currentColor; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+.menu-toggle.active span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.menu-toggle.active span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.menu-toggle.active span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.mobile-menu {
+    display: flex; flex-direction: column; gap: 2px; position: absolute;
+    top: calc(100% + 10px); left: 0; right: 0; padding: 10px;
+    border: 1px solid rgba(96,165,250,0.18); border-radius: 18px; background: linear-gradient(145deg, rgba(13, 21, 35, 0.96), rgba(7, 13, 24, 0.98));
+    backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+    opacity: 0; visibility: hidden; transform: translateY(-10px) scale(0.98);
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1); z-index: 200; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+}
+.mobile-menu.active { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+.mobile-menu a { color: var(--text); text-decoration: none; padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 500; transition: all .2s ease; display: flex; align-items: center; }
+.mobile-menu a:hover { background: var(--blue-soft); color: var(--blue-light); transform: translateX(3px); }
+
+/* TOOL CONTAINER & HERO */
+.tool-page {
+    width: min(1180px, calc(100% - 32px));
+    margin: 0 auto;
+    padding-top: 140px;
+    padding-bottom: 100px;
+}
+
+.page-header { margin-bottom: 35px; }
+
+.eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600; backdrop-filter: blur(14px); margin-bottom: 16px;
+}
+
+.status-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 10px rgba(34,197,94,.5);
+}
+
+.page-header h1 { font-size: clamp(32px, 5vw, 54px); letter-spacing: -2px; font-weight: 800; }
+.page-header h1 span { color: var(--blue-light); }
+.page-header p { margin-top: 12px; color: var(--muted); font-size: 14px; max-width: 600px; line-height: 1.7; }
+
+/* TESTER METRICS & CANVAS */
+.metrics-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;
+}
+
+.metric-card {
+    padding: 20px; border-radius: 18px; border: 1px solid var(--border);
+    background: var(--surface); backdrop-filter: blur(20px); box-shadow: 0 15px 40px var(--shadow);
+}
+.metric-card strong { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.metric-value { font-size: clamp(28px, 4vw, 42px); font-weight: 800; margin-top: 8px; color: var(--text); }
+.metric-value span { font-size: 16px; font-weight: 600; color: var(--blue-light); margin-left: 4px; }
+.metric-sub { margin-top: 6px; font-size: 11px; color: var(--muted); }
+
+.test-area-container {
+    position: relative; border-radius: 24px; border: 1px solid var(--border);
+    background: var(--surface-strong); backdrop-filter: blur(30px); box-shadow: 0 30px 80px var(--shadow);
+    overflow: hidden; padding: 20px;
+}
+.test-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.test-title { font-size: 14px; font-weight: 700; }
+.test-instruction { font-size: 12px; color: var(--muted); }
+
+#touchCanvas {
+    width: 100%; height: 450px; border-radius: 16px; background: rgba(5, 8, 16, 0.85);
+    border: 1px dashed rgba(96,165,250,0.3); touch-action: none; cursor: crosshair;
+}
+.test-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+
+/* FOOTER */
+footer { width: min(1180px, calc(100% - 32px)); margin: 60px auto 0; padding: 60px 0 40px; border-top: 1px solid var(--border); }
+.footer-container { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; }
+.footer-brand { display: flex; flex-direction: column; gap: 16px; }
+.footer-logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: var(--text); }
+.footer-desc { color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 300px; }
+.footer-column h4 { color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 16px; letter-spacing: 0.5px; }
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.footer-links a { color: var(--muted); text-decoration: none; font-size: 13px; transition: color 0.25s ease; }
+.footer-links a:hover { color: var(--text); }
+.footer-bottom { margin-top: 50px; padding-top: 25px; border-top: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; }
+
+/* MODALS & SETTINGS */
+.settings-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; visibility: hidden; pointer-events: none; transition: 0.3s ease; z-index: 9999; }
+.settings-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
+.settings-panel { width: min(430px, 100%); background: rgba(13, 21, 35, 0.94); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 24px; padding: 34px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); transform: translateY(25px) scale(0.96); transition: 0.35s ease; position: relative; }
+.settings-overlay.active .settings-panel { transform: translateY(0) scale(1); }
+.close-settings { position: absolute; top: 16px; right: 17px; width: 34px; height: 34px; border: none; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: var(--text); cursor: pointer; font-size: 18px; transition: 0.25s ease; }
+.close-settings:hover { background: rgba(59, 130, 246, 0.15); color: #60a5fa; transform: rotate(90deg); }
+
+.setting-item { margin-top:20px !important; }
+.setting-label { font-size:10px !important; text-transform:uppercase; letter-spacing:.9px; }
+.setting-row {
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    margin-top:10px; padding:15px; border-radius:16px;
+    border:1px solid rgba(96,165,250,.13);
+    background:linear-gradient(135deg,rgba(59,130,246,.09),rgba(255,255,255,.025));
+}
+.setting-row strong { display:block; font-size:12px; }
+.setting-row span { display:block; margin-top:5px; color:var(--muted); font-size:9px; line-height:1.5; }
+.coming-soon-btn {
+    flex-shrink:0; border:1px solid rgba(96,165,250,.20); border-radius:10px;
+    padding:9px 10px; background:rgba(59,130,246,.10); color:#93c5fd;
+    font-family:inherit; font-size:9px; font-weight:700; cursor:pointer;
+}
+
+/* ACCOUNT PROFILE MENU */
+.desktop-auth { display:flex; align-items:center; gap:8px; }
+.user-menu{position:relative;display:none;align-items:center;}
+.user-menu.active{display:flex !important;}
+.user-profile-btn{width:38px;height:38px;padding:0;border:1px solid var(--border);border-radius:50%;background:transparent;cursor:pointer;box-shadow:0 8px 22px rgba(59,130,246,.15);transition:.25s ease;}
+.user-profile-btn:hover{transform:translateY(-1px);border-color:rgba(96,165,250,.35);background:rgba(59,130,246,.08);}
+.user-avatar,.mobile-avatar{display:flex;align-items:center;justify-content:center;border-radius:50%;background:linear-gradient(145deg,var(--blue-light),var(--blue));color:#fff;font-weight:800;}
+.user-avatar{width:34px;height:34px;margin:1px;font-size:12px;}
+.profile-dropdown{position:absolute;top:calc(100% + 12px);right:0;width:245px;padding:14px;border:1px solid rgba(96,165,250,.16);border-radius:16px;background:linear-gradient(145deg,rgba(17,27,44,.97),rgba(7,13,24,.97));backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);box-shadow:0 28px 75px rgba(0,0,0,.48);opacity:0;visibility:hidden;transform:translateY(-8px) scale(.98);transition:all .25s ease;z-index:300;}
+.profile-dropdown.active{opacity:1;visibility:visible;transform:translateY(0) scale(1);}
+.profile-heading{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;}
+.profile-email{margin-top:5px;color:var(--text);font-size:12px;font-weight:600;word-break:break-all;}
+.profile-divider{height:1px;background:var(--border);margin:12px 0;}
+.profile-premium,.profile-dropdown .logout-btn{width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:10px 8px;border-radius:99px;font-family:inherit;font-size:11px;cursor:pointer;}
+.profile-premium{background:rgba(59,130,246,.06);border:1px solid rgba(96,165,250,.10);margin-bottom:4px;}
+.profile-premium span{float:right;color:#60a5fa;font-size:8px;font-weight:700;}
+.profile-premium:hover,.profile-dropdown .logout-btn:hover{background:var(--blue-soft);}
+.mobile-auth,.mobile-user{display:flex;flex-direction:column;gap:6px;}
+.mobile-user{display:none;}
+.mobile-user.active{display:flex;}
+.mobile-auth.hidden{display:none;}
+.mobile-user-info{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid rgba(255,255,255,.07);border-radius:10px;background:rgba(255,255,255,.025);}
+.mobile-avatar{width:32px;height:32px;flex-shrink:0;font-size:12px;}
+.mobile-user-info strong{display:block;font-size:11px;color:var(--text);}
+.mobile-user-info span{display:block;margin-top:2px;color:var(--muted);font-size:8px;word-break:break-all;}
+.mobile-menu-btn{width:100%;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;text-align:left;text-decoration:none;display:block;box-sizing:border-box;}
+.mobile-menu-btn:hover{background:var(--blue-soft);}
+.mobile-logout{color:#fca5a5;}
+
+@media (max-width: 950px) {
+    .nav-links, .desktop-auth { display: none !important; }
+    .menu-toggle { display: flex !important; }
+    .metrics-grid { grid-template-columns: 1fr; }
+    .footer-container { grid-template-columns: 1fr 1fr; gap: 30px; }
+    .footer-brand { grid-column: span 2; }
+}
+
+@media (max-width: 600px) {
+    .page-container { margin-top: 130px; }
+    .footer-container { grid-template-columns: 1fr; }
+    .footer-brand { grid-column: span 1; }
+    #touchCanvas { height: 350px; }
+}
+@media (max-width:500px){
+    .footer-bottom{flex-direction:column;align-items:flex-start;gap:8px;text-align:left;}
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+<svg style="display:none" aria-hidden="true">
+<defs>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.6"/><rect x="11" y="1.4" width="2" height="3.4" rx="1"/><rect x="11" y="1.4" width="2" height="3.4" rx="1" transform="rotate(60 12 12)"/><rect x="11" y="1.4" width="2" height="3.4" rx="1" transform="rotate(120 12 12)"/><rect x="11" y="1.4" width="2" height="3.4" rx="1" transform="rotate(180 12 12)"/><rect x="11" y="1.4" width="2" height="3.4" rx="1" transform="rotate(240 12 12)"/><rect x="11" y="1.4" width="2" height="3.4" rx="1" transform="rotate(300 12 12)"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 2.5 13.8 9.2 20.5 11 13.8 12.8 12 19.5 10.2 12.8 3.5 11 10.2 9.2Z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="4 12.5 9.5 18 20 6"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><line x1="12" y1="8" x2="12" y2="13.5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></symbol>
+<symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="6.5" y="2" width="11" height="20" rx="2.5"/><line x1="10.5" y1="18.3" x2="13.5" y2="18.3"/></symbol>
+</defs>
+</svg>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<div class="ambient"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <a href="index.html" class="logo">
+        <img src="images/ChatGPT Image Sep 15, 2026, 11_19_40 AM.png" alt="Hylodia Logo" class="logo-img">
+        Hylodia Games
+    </a>
+
+    <div class="nav-links">
+        <a href="index.html#home">Home</a>
+        <a href="index.html#tools">Tools</a>
+        <a href="index.html#features">Features</a>
+        <a href="index.html#about">About</a>
+        <a href="index.html#contact">Contact</a>
+    </div>
+
+    <div class="nav-actions">
+        <button class="nav-btn settings-btn" onclick="openSettings()">⚙ Settings</button>
+
+        <div class="desktop-auth" id="desktopAuth">
+            <button class="nav-btn" onclick="openAuth('login')">Login</button>
+            <button class="nav-btn signup" onclick="openAuth('signup')">Sign Up</button>
+
+        </div>
+
+        <div class="user-menu" id="userMenu">
+            <button class="user-profile-btn" onclick="toggleProfileMenu()" aria-label="Open profile">
+                <span class="user-avatar" id="userAvatar">U</span>
+            </button>
+            <div class="profile-dropdown" id="profileDropdown">
+                <div class="profile-heading">Account</div>
+                <div class="profile-email" id="profileEmail">user@example.com</div>
+                <div class="profile-divider"></div>
+                <button class="profile-premium" onclick="showPremiumComingSoon()">Upgrade to Premium <span>Coming Soon</span></button>
+                <button class="logout-btn" onclick="logoutUser()">Log out</button>
+            </div>
+        </div>
+
+        <button class="menu-toggle" id="menuToggle" onclick="toggleMobileMenu()" aria-label="Toggle Navigation">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+
+    <!-- MOBILE MENU -->
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html#home" onclick="closeMobileMenu()">Home</a>
+        <a href="index.html#tools" onclick="closeMobileMenu()">Tools</a>
+        <a href="index.html#features" onclick="closeMobileMenu()">Features</a>
+        <a href="index.html#about" onclick="closeMobileMenu()">About</a>
+        <a href="index.html#contact" onclick="closeMobileMenu()">Contact</a>
+        <div style="height:1px; background:var(--border); margin:4px 0;"></div>
+        <div class="mobile-auth" id="mobileAuth">
+             <a href="javascript:void(0)" onclick="openAuth('login')" style="color:var(--blue-light)">Log In</a>
+            <a href="javascript:void(0)" onclick="openAuth('signup')" style="background:var(--blue); color:white; text-align:center; border-radius:8px;">Sign Up</a>
+        </div>
+        <div class="mobile-user" id="mobileUser">
+            <div class="mobile-user-info">
+                <div class="mobile-avatar" id="mobileAvatar">U</div>
+                <div>
+                    <strong id="mobileUserName">User</strong>
+                    <span id="mobileUserEmail">user@example.com</span>
+                </div>
+            </div>
+            <button class="mobile-menu-btn" onclick="showPremiumComingSoon()">Upgrade to Premium</button>
+            <button class="mobile-menu-btn mobile-logout" onclick="logoutUser()">Log out</button>
+        </div>
+    </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="tool-page">
+    <div class="page-header">
+        <div class="eyebrow">
+            <span class="status-dot"></span>
+            Mobile & Display Utility
+        </div>
+        <h1>Touch Sampling & <span>Refresh Rate Tester</span></h1>
+        <p>Test your phone or monitor display smoothness (FPS/Hz) and finger swipe touch response rate (Hz) live with high accuracy.</p>
+    </div>
+
+    <!-- METRICS GRID -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <strong>Display Refresh Rate</strong>
+            <div class="metric-value" id="displayFps">-- <span>Hz</span></div>
+            <div class="metric-sub">Calculated via requestAnimationFrame</div>
+        </div>
+
+        <div class="metric-card">
+            <strong>Touch Sampling Rate</strong>
+            <div class="metric-value" id="touchHz">0 <span>Hz</span></div>
+            <div class="metric-sub">Live touch polling frequency</div>
+        </div>
+
+        <div class="metric-card">
+            <strong>Estimated Input Delay</strong>
+            <div class="metric-value" id="inputDelay">-- <span>ms</span></div>
+            <div class="metric-sub">Touch latency estimation</div>
+        </div>
+    </div>
+
+    <!-- TEST AREA -->
+    <div class="test-area-container">
+        <div class="test-header">
+            <div class="test-title">Interactive Touch Test Canvas</div>
+            <div class="test-instruction">Swipe or drag your finger across the box below</div>
+        </div>
+
+        <canvas id="touchCanvas"></canvas>
+
+        <div class="test-controls">
+            <span class="metric-sub" id="touchEventsCount">Events logged: 0</span>
+            <button class="nav-btn" onclick="resetTestStats()">Clear Trail & Stats</button>
+        </div>
+    </div>
+</main>
+
+<!-- =========================
+     FOOTER
+========================= -->
+
+<footer>
+    <div class="footer-container">
+        
+        <!-- Brand Info -->
+        <div class="footer-brand">
+            <div class="footer-logo">
+                <img src="images/ChatGPT Image Sep 15, 2026, 11_19_40 AM.png" alt="Hylodia Logo" class="footer-logo-img">
+                Hylodia
+            </div>
+            <p class="footer-desc">
+                Everything gamers need, in one place — discovery, library, tools and community.
+            </p>
+        </div>
+
+        <!-- Column 1: Platform -->
+        <div class="footer-column">
+            <h4>Platform</h4>
+            <ul class="footer-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#tools">Tools</a></li>
+                 <li><a href="#features">Features</a></li>
+                <li><a href="about.html">About</a></li>
+                <li><a href="contact.html">Contact</a></li>
+            </ul>
+        </div>
+
+        <!-- Column 2: Legal -->
+        <div class="footer-column">
+            <h4>Legal</h4>
+            <ul class="footer-links">
+                <li><a href="privacy-policy.html">Privacy Policy</a></li>
+                <li><a href="terms-of-service.html">Terms of Service</a></li>
+                <li><a href="cookie-policy.html">Cookie Policy</a></li>
+            </ul>
+        </div>
+
+        <!-- Column 3: Account -->
+        <div class="footer-column">
+            <h4>Account</h4>
+            <ul class="footer-links">
+                <li><a href="premium.html" onclick="showPremiumComingSoon(); return false;">Premium</a></li>
+                <li><a href="auth.html?mode=login">Log in / Sign up</a></li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- Footer Bottom -->
+    <div class="footer-bottom">
+        <div>© 2026 <strong>Hylodia Games</strong>. All rights reserved.</div>
+        <div>Built for gamers.</div>
+    </div>
+</footer>
+<!-- SETTINGS MODAL -->
+<div class="settings-overlay" id="settingsOverlay">
+    <div class="settings-panel">
+        <div class="settings-header">
+            <h3>Settings</h3>
+            <button class="close-settings" onclick="closeSettings()">×</button>
+        </div>
+        <div class="setting-item">
+            <div class="setting-label">Premium</div>
+            <div class="setting-row">
+                <div><strong>Upgrade to Premium</strong><span>Premium features are coming soon.</span></div>
+                <button class="coming-soon-btn" onclick="showPremiumComingSoon()">Coming Soon</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+/* =====================================================
+   HYLODIA GAMES — UNIVERSAL AUTH MODULE
+   Place this at the end of every page. Replaces all
+   other auth-related JS (updateUserUI, checkCurrentUser,
+   logoutUser, showPremiumComingSoon, openAuth, etc.)
+===================================================== */
+
+const SUPABASE_URL = "https://ldwdtzwqybjdwbbdmnql.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_iCru3UduBGUT1WgC8m33lA_YVk5FhlC";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { detectSessionInUrl: true, persistSession: true }
+});
+
+/* ---------- NAVIGATION HELPERS ---------- */
+function getCurrentPageName() {
+    const path = window.location.pathname.split("/").pop();
+    return path && path.length > 0 ? path : "index.html";
+}
+
+function openAuth(mode = "login") {
+    const redirect = encodeURIComponent(getCurrentPageName());
+    window.location.href = `auth.html?mode=${mode}&redirect=${redirect}`;
+}
+
+function openMobileAuth(mode = "login") {
+    closeMobileMenu();
+    openAuth(mode);
+}
+
+/* ---------- USER UI ---------- */
+function updateUserUI(user) {
+    const desktopAuth = document.getElementById("desktopAuth");
+    const userMenu = document.getElementById("userMenu");
+    const userAvatar = document.getElementById("userAvatar");
+    const profileEmail = document.getElementById("profileEmail");
+    const mobileAuth = document.getElementById("mobileAuth");
+    const mobileUser = document.getElementById("mobileUser");
+    const mobileAvatar = document.getElementById("mobileAvatar");
+    const mobileUserName = document.getElementById("mobileUserName");
+    const mobileUserEmail = document.getElementById("mobileUserEmail");
+
+    if (user) {
+        // Logged in → hide auth buttons, show profile
+        if (desktopAuth) desktopAuth.style.setProperty("display", "none", "important");
+        if (userMenu) userMenu.classList.add("active");
+
+        const email = user.email || "User";
+        const name = user.user_metadata?.full_name
+                  || user.user_metadata?.name
+                  || email.split("@")[0]
+                  || "User";
+        const letter = name.charAt(0).toUpperCase();
+
+        if (userAvatar) userAvatar.textContent = letter;
+        if (profileEmail) profileEmail.textContent = email;
+
+        if (mobileAuth) mobileAuth.classList.add("hidden");
+        if (mobileUser) mobileUser.classList.add("active");
+        if (mobileAvatar) mobileAvatar.textContent = letter;
+        if (mobileUserName) mobileUserName.textContent = name;
+        if (mobileUserEmail) mobileUserEmail.textContent = email;
+    } else {
+        // Logged out → show auth buttons
+        if (desktopAuth) desktopAuth.style.removeProperty("display");
+        if (userMenu) userMenu.classList.remove("active");
+        if (mobileAuth) mobileAuth.classList.remove("hidden");
+        if (mobileUser) mobileUser.classList.remove("active");
+        closeProfileMenu();
+    }
+}
+
+async function checkCurrentUser() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    updateUserUI(session?.user || null);
+}
+
+// Live updates: login/logout anywhere reflects instantly
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    updateUserUI(session?.user || null);
+});
+
+/* ---------- LOGOUT ---------- */
+async function logoutUser() {
+    closeProfileMenu();
+    closeMobileMenu();
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) {
+        console.error("Logout error:", error);
+        return;
+    }
+    updateUserUI(null);
+    // Refresh the page so any protected UI resets cleanly
+    window.location.reload();
+}
+
+/* ---------- PROFILE DROPDOWN ---------- */
+function toggleProfileMenu() {
+    const d = document.getElementById("profileDropdown");
+    if (d) d.classList.toggle("active");
+}
+function closeProfileMenu() {
+    const d = document.getElementById("profileDropdown");
+    if (d) d.classList.remove("active");
+}
+
+/* ---------- PREMIUM ---------- */
+function showPremiumComingSoon() {
+    closeProfileMenu();
+    closeMobileMenu();
+    window.location.href = "premium.html";
+}
+
+/* ---------- MOBILE MENU ---------- */
+function toggleMobileMenu() {
+    const m = document.getElementById("mobileMenu");
+    const t = document.getElementById("menuToggle");
+    if (!m || !t) return;
+    const open = m.classList.toggle("active");
+    t.classList.toggle("active", open);
+    t.setAttribute("aria-expanded", String(open));
+}
+function closeMobileMenu() {
+    const m = document.getElementById("mobileMenu");
+    const t = document.getElementById("menuToggle");
+    if (!m || !t) return;
+    m.classList.remove("active");
+    t.classList.remove("active");
+    t.setAttribute("aria-expanded", "false");
+}
+
+/* ---------- SETTINGS MODAL ---------- */
+function openSettings() {
+    const o = document.getElementById("settingsOverlay");
+    if (o) o.classList.add("active");
+}
+function closeSettings() {
+    const o = document.getElementById("settingsOverlay");
+    if (o) o.classList.remove("active");
+}
+
+/* ---------- GLOBAL LISTENERS ---------- */
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".navbar")) {
+        closeMobileMenu();
+        closeProfileMenu();
+    }
+    // Close settings if clicking backdrop
+    const overlay = document.getElementById("settingsOverlay");
+    if (overlay && e.target === overlay) closeSettings();
+});
+
+window.addEventListener("resize", () => {
+    if (window.innerWidth > 950) closeMobileMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        closeSettings();
+        closeMobileMenu();
+        closeProfileMenu();
+    }
+});
+
+/* ---------- INITIALIZE ---------- */
+checkCurrentUser();
+/* SHOW A ONE-TIME TOAST ONLY ON PC / DESKTOP VISITORS */
+function checkDeviceForSideNotice() {
+    // 1. Mobile & Tablet Devices අඳුනා ගැනීම (User Agent & Screen Width හරහා)
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+    // 2. මේ Session එකේදී Notification එක කලින් පෙන්වා තිබේදැයි බලයි
+    const hasSeenNotice = sessionStorage.getItem("hasSeenMobileNotice");
+
+    // PC Visitor කෙනෙක් නම් සහ කලින් Notification එක පෙන්නලා නැත්නම් විතරක් පෙන්වන්න
+    if (!isMobileDevice && !hasSeenNotice) {
+        // notification එක පෙන්වූ බව Save කරගනියි
+        sessionStorage.setItem("hasSeenMobileNotice", "true");
+
+        setTimeout(() => {
+            showToast({
+                type: "info",
+                title: "Better on mobile",
+                text: "You're on a desktop, so touch sampling can't be tested here. For accurate results (240Hz/480Hz+), open this page on your phone or tablet.",
+                duration: 7000
+            });
+        }, 1200);
+    }
+}
+
+// Page එක Load වෙද්දී පමණක් Run වේ
+checkDeviceForSideNotice();
+function showToast({ type = "success", title = "", text = "", duration = 5000 }) {
+    const stack = document.getElementById("toastStack");
+    if (!stack) return;
+
+    const toast = document.createElement("div");
+    toast.className = "toast toast-" + type;
+
+    const iconName = type === "error" ? "i-alert" : type === "info" ? "i-smartphone" : "i-check";
+
+    toast.innerHTML = `
+        <div class="toast-icon">
+            <svg class="icon-svg"><use href="#${iconName}"></use></svg>
+        </div>
+        <div class="toast-body">
+            <strong>${title}</strong>
+            <span>${text}</span>
+        </div>
+        <button class="toast-close" aria-label="Dismiss">&times;</button>
+    `;
+
+    stack.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("toast-in"));
+
+    const remove = () => {
+        toast.classList.remove("toast-in");
+        toast.classList.add("toast-out");
+        setTimeout(() => toast.remove(), 400);
+    };
+
+    toast.querySelector(".toast-close").addEventListener("click", remove);
+    setTimeout(remove, duration);
+}
+
+/* 1. DISPLAY REFRESH RATE (Hz/FPS) */
+let frameCount = 0;
+let lastFpsTime = performance.now();
+const displayFpsElem = document.getElementById('displayFps');
+
+function calculateDisplayFps(now) {
+    frameCount++;
+    const delta = now - lastFpsTime;
+
+    if (delta >= 1000) {
+        const fps = Math.round((frameCount * 1000) / delta);
+        displayFpsElem.innerHTML = `${fps} <span>Hz</span>`;
+        frameCount = 0;
+        lastFpsTime = now;
+    }
+
+    requestAnimationFrame(calculateDisplayFps);
+}
+requestAnimationFrame(calculateDisplayFps);
+
+/* 2. TOUCH SAMPLING RATE & CANVAS */
+const canvas = document.getElementById('touchCanvas');
+const ctx = canvas.getContext('2d');
+const touchHzElem = document.getElementById('touchHz');
+const inputDelayElem = document.getElementById('inputDelay');
+const eventsCountElem = document.getElementById('touchEventsCount');
+
+let touchTimestamps = [];
+let touchPoints = [];
+let totalEvents = 0;
+
+function resizeCanvas() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function recordTouch(x, y) {
+    const now = performance.now();
+    touchTimestamps.push(now);
+    touchPoints.push({ x, y, alpha: 1.0 });
+    totalEvents++;
+
+    touchTimestamps = touchTimestamps.filter(t => now - t <= 1000);
+
+    const currentTouchHz = touchTimestamps.length;
+    touchHzElem.innerHTML = `${currentTouchHz} <span>Hz</span>`;
+
+    if (currentTouchHz > 0) {
+        const estimatedDelay = (1000 / currentTouchHz).toFixed(1);
+        inputDelayElem.innerHTML = `${estimatedDelay} <span>ms</span>`;
+    }
+
+    eventsCountElem.textContent = `Events logged: ${totalEvents}`;
+}
+
+function handlePointerMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    
+    if (e.touches) {
+        for (let i = 0; i < e.touches.length; i++) {
+            const touch = e.touches[i];
+            recordTouch(touch.clientX - rect.left, touch.clientY - rect.top);
+        }
+    } else if (e.buttons === 1) {
+        recordTouch(e.clientX - rect.left, e.clientY - rect.top);
+    }
+}
+
+canvas.addEventListener('touchmove', handlePointerMove, { passive: true });
+canvas.addEventListener('touchstart', handlePointerMove, { passive: true });
+canvas.addEventListener('mousemove', handlePointerMove);
+
+function drawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < touchPoints.length; i++) {
+        const p = touchPoints[i];
+        
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8 * p.alpha, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(96, 165, 250, ${p.alpha})`;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#3b82f6';
+        ctx.fill();
+
+        p.alpha -= 0.015;
+    }
+
+    touchPoints = touchPoints.filter(p => p.alpha > 0);
+    requestAnimationFrame(drawCanvas);
+}
+drawCanvas();
+
+function resetTestStats() {
+    touchTimestamps = [];
+    touchPoints = [];
+    totalEvents = 0;
+    touchHzElem.innerHTML = `0 <span>Hz</span>`;
+    inputDelayElem.innerHTML = `-- <span>ms</span>`;
+    eventsCountElem.textContent = `Events logged: 0`;
+}
+</script>
+</body>
+</html>
