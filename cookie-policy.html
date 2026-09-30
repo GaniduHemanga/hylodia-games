@@ -4,7 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cookie Policy — Hylodia Games</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-87ZEE6YY12"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
 
+  gtag('config', 'G-87ZEE6YY12');
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -604,12 +612,37 @@ footer {
 </div>
 
 <script>
+/* =====================================================
+   HYLODIA GAMES — UNIVERSAL AUTH MODULE
+   Place this at the end of every page. Replaces all
+   other auth-related JS (updateUserUI, checkCurrentUser,
+   logoutUser, showPremiumComingSoon, openAuth, etc.)
+===================================================== */
+
 const SUPABASE_URL = "https://ldwdtzwqybjdwbbdmnql.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_iCru3UduBGUT1WgC8m33lA_YVk5FhlC";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { detectSessionInUrl: true, persistSession: true }
+});
 
-/* ===== ACCOUNT PROFILE MENU (added) ===== */
+/* ---------- NAVIGATION HELPERS ---------- */
+function getCurrentPageName() {
+    const path = window.location.pathname.split("/").pop();
+    return path && path.length > 0 ? path : "index.html";
+}
+
+function openAuth(mode = "login") {
+    const redirect = encodeURIComponent(getCurrentPageName());
+    window.location.href = `auth.html?mode=${mode}&redirect=${redirect}`;
+}
+
+function openMobileAuth(mode = "login") {
+    closeMobileMenu();
+    openAuth(mode);
+}
+
+/* ---------- USER UI ---------- */
 function updateUserUI(user) {
     const desktopAuth = document.getElementById("desktopAuth");
     const userMenu = document.getElementById("userMenu");
@@ -620,21 +653,30 @@ function updateUserUI(user) {
     const mobileAvatar = document.getElementById("mobileAvatar");
     const mobileUserName = document.getElementById("mobileUserName");
     const mobileUserEmail = document.getElementById("mobileUserEmail");
+
     if (user) {
-        if (desktopAuth) desktopAuth.style.display = "none";
+        // Logged in → hide auth buttons, show profile
+        if (desktopAuth) desktopAuth.style.setProperty("display", "none", "important");
         if (userMenu) userMenu.classList.add("active");
+
         const email = user.email || "User";
-        const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || email.split("@")[0] || "User";
+        const name = user.user_metadata?.full_name
+                  || user.user_metadata?.name
+                  || email.split("@")[0]
+                  || "User";
         const letter = name.charAt(0).toUpperCase();
+
         if (userAvatar) userAvatar.textContent = letter;
         if (profileEmail) profileEmail.textContent = email;
+
         if (mobileAuth) mobileAuth.classList.add("hidden");
         if (mobileUser) mobileUser.classList.add("active");
         if (mobileAvatar) mobileAvatar.textContent = letter;
         if (mobileUserName) mobileUserName.textContent = name;
         if (mobileUserEmail) mobileUserEmail.textContent = email;
     } else {
-        if (desktopAuth) desktopAuth.style.display = "flex";
+        // Logged out → show auth buttons
+        if (desktopAuth) desktopAuth.style.removeProperty("display");
         if (userMenu) userMenu.classList.remove("active");
         if (mobileAuth) mobileAuth.classList.remove("hidden");
         if (mobileUser) mobileUser.classList.remove("active");
@@ -644,21 +686,29 @@ function updateUserUI(user) {
 
 async function checkCurrentUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    updateUserUI(session ? session.user : null);
+    updateUserUI(session?.user || null);
 }
 
+// Live updates: login/logout anywhere reflects instantly
 supabaseClient.auth.onAuthStateChange((event, session) => {
-    updateUserUI(session ? session.user : null);
+    updateUserUI(session?.user || null);
 });
 
-checkCurrentUser();
-
+/* ---------- LOGOUT ---------- */
 async function logoutUser() {
+    closeProfileMenu();
+    closeMobileMenu();
     const { error } = await supabaseClient.auth.signOut();
-    if (error) { console.error("Logout error:", error); return; }
+    if (error) {
+        console.error("Logout error:", error);
+        return;
+    }
     updateUserUI(null);
+    // Refresh the page so any protected UI resets cleanly
+    window.location.reload();
 }
 
+/* ---------- PROFILE DROPDOWN ---------- */
 function toggleProfileMenu() {
     const d = document.getElementById("profileDropdown");
     if (d) d.classList.toggle("active");
@@ -667,102 +717,67 @@ function closeProfileMenu() {
     const d = document.getElementById("profileDropdown");
     if (d) d.classList.remove("active");
 }
-function closeMobileMenu() {
-    const m = document.getElementById("mobileMenu");
-    const t = document.getElementById("menuToggle");
-    if (m) m.classList.remove("active");
-    if (t) t.classList.remove("active");
-}
+
+/* ---------- PREMIUM ---------- */
 function showPremiumComingSoon() {
     closeProfileMenu();
     closeMobileMenu();
     window.location.href = "premium.html";
 }
-document.addEventListener("click", function(e) {
+
+/* ---------- MOBILE MENU ---------- */
+function toggleMobileMenu() {
+    const m = document.getElementById("mobileMenu");
+    const t = document.getElementById("menuToggle");
+    if (!m || !t) return;
+    const open = m.classList.toggle("active");
+    t.classList.toggle("active", open);
+    t.setAttribute("aria-expanded", String(open));
+}
+function closeMobileMenu() {
+    const m = document.getElementById("mobileMenu");
+    const t = document.getElementById("menuToggle");
+    if (!m || !t) return;
+    m.classList.remove("active");
+    t.classList.remove("active");
+    t.setAttribute("aria-expanded", "false");
+}
+
+/* ---------- SETTINGS MODAL ---------- */
+function openSettings() {
+    const o = document.getElementById("settingsOverlay");
+    if (o) o.classList.add("active");
+}
+function closeSettings() {
+    const o = document.getElementById("settingsOverlay");
+    if (o) o.classList.remove("active");
+}
+
+/* ---------- GLOBAL LISTENERS ---------- */
+document.addEventListener("click", (e) => {
     if (!e.target.closest(".navbar")) {
         closeMobileMenu();
         closeProfileMenu();
     }
+    // Close settings if clicking backdrop
+    const overlay = document.getElementById("settingsOverlay");
+    if (overlay && e.target === overlay) closeSettings();
 });
-function toggleMobileMenu() {
-    document.getElementById("mobileMenu").classList.toggle("active");
-    document.getElementById("menuToggle").classList.toggle("active");
-}
-function openSettings() { document.getElementById("settingsOverlay").classList.add("active"); }
-function closeSettings() { document.getElementById("settingsOverlay").classList.remove("active"); }
-function redirectToHomeAuth(type) { window.location.href = "auth.html?mode=login" + type; }
 
-function toggleMobileMenu() {
-    const mobileMenu = document.getElementById("mobileMenu");
-    const menuToggle = document.getElementById("menuToggle");
-    if (mobileMenu && menuToggle) {
-        const active = mobileMenu.classList.toggle("active");
-        menuToggle.classList.toggle("active", active);
-    }
-}
-/* =========================
-   OPEN AUTH PAGE
-========================= */
+window.addEventListener("resize", () => {
+    if (window.innerWidth > 950) closeMobileMenu();
+});
 
-function openAuth(mode = "login") {
-    window.location.href = `auth.html?mode=${mode}`;
-}
-
-function openMobileAuth(mode = "login") {
-    closeMobileMenu();
-    window.location.href = `auth.html?mode=${mode}`;
-}
-
-
-/* =========================
-   CLOSE AUTH
-========================= */
-
-function closeAuth() {
-
-    document
-        .getElementById("authOverlay")
-        .classList.remove("active");
-
-    clearAuthMessage();
-}
-
-
-/* =========================
-   SWITCH LOGIN / SIGNUP
-========================= */
-
-function switchAuthMode() {
-
-    authMode =
-        authMode === "login"
-        ? "signup"
-        : "login";
-
-    updateAuthUI();
-}
-
-/* =========================
-   SETTINGS
-========================= */
-
-const overlay = document.getElementById("settingsOverlay");
-
-function openSettings() {
-    overlay.classList.add("active");
-}
-
-function closeSettings() {
-    overlay.classList.remove("active");
-}
-
-overlay.addEventListener("click", function(e) {
-    if (e.target === overlay) {
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
         closeSettings();
+        closeMobileMenu();
+        closeProfileMenu();
     }
 });
 
-
+/* ---------- INITIALIZE ---------- */
+checkCurrentUser();
 </script>
 
 </body>

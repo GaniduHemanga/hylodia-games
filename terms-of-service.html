@@ -4,7 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Terms of Service — Hylodia Games</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-87ZEE6YY12"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
 
+  gtag('config', 'G-87ZEE6YY12');
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -549,17 +557,31 @@ footer { width: min(1180px, calc(100% - 32px)); margin: 60px auto 0; padding: 60
 <!-- FOOTER -->
 <footer>
     <div class="footer-container">
+        
+        <!-- Brand Info -->
         <div class="footer-brand">
-            <div class="footer-logo"><img src="images/ChatGPT Image Sep 15, 2026, 11_19_40 AM.png" alt="Hylodia Logo" class="logo-img">Hylodia</div>
-            <p class="footer-desc">Everything gamers need, in one place — discovery, library, tools and community.</p>
+            <div class="footer-logo">
+                <img src="images/ChatGPT Image Sep 15, 2026, 11_19_40 AM.png" alt="Hylodia Logo" class="footer-logo-img">
+                Hylodia
+            </div>
+            <p class="footer-desc">
+                Everything gamers need, in one place — discovery, library, tools and community.
+            </p>
         </div>
+
+        <!-- Column 1: Platform -->
         <div class="footer-column">
             <h4>Platform</h4>
             <ul class="footer-links">
-                <li><a href="index.html#home">Home</a></li>
-                <li><a href="index.html#tools">Tools</a></li>          
+                <li><a href="#home">Home</a></li>
+                <li><a href="#tools">Tools</a></li>
+                 <li><a href="#features">Features</a></li>
+                <li><a href="about.html">About</a></li>
+                <li><a href="contact.html">Contact</a></li>
             </ul>
         </div>
+
+        <!-- Column 2: Legal -->
         <div class="footer-column">
             <h4>Legal</h4>
             <ul class="footer-links">
@@ -568,20 +590,24 @@ footer { width: min(1180px, calc(100% - 32px)); margin: 60px auto 0; padding: 60
                 <li><a href="cookie-policy.html">Cookie Policy</a></li>
             </ul>
         </div>
+
+        <!-- Column 3: Account -->
         <div class="footer-column">
             <h4>Account</h4>
             <ul class="footer-links">
-                <li><a href="premium.html">Premium</a></li>
-                <li><a href="index copy.html">Log in / Sign up</a></li>
+                <li><a href="premium.html" onclick="showPremiumComingSoon(); return false;">Premium</a></li>
+                <li><a href="auth.html?mode=login">Log in / Sign up</a></li>
             </ul>
         </div>
+
     </div>
+
+    <!-- Footer Bottom -->
     <div class="footer-bottom">
         <div>© 2026 <strong>Hylodia Games</strong>. All rights reserved.</div>
         <div>Built for gamers.</div>
     </div>
 </footer>
-
 <!-- SETTINGS MODAL -->
 <div class="settings-overlay" id="settingsOverlay">
     <div class="settings-panel">
@@ -592,11 +618,37 @@ footer { width: min(1180px, calc(100% - 32px)); margin: 60px auto 0; padding: 60
 </div>
 
 <script>
+/* =====================================================
+   HYLODIA GAMES — UNIVERSAL AUTH MODULE
+   Place this at the end of every page. Replaces all
+   other auth-related JS (updateUserUI, checkCurrentUser,
+   logoutUser, showPremiumComingSoon, openAuth, etc.)
+===================================================== */
+
 const SUPABASE_URL = "https://ldwdtzwqybjdwbbdmnql.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_iCru3UduBGUT1WgC8m33lA_YVk5FhlC";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ===== ACCOUNT PROFILE MENU (added/completed) ===== */
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { detectSessionInUrl: true, persistSession: true }
+});
+
+/* ---------- NAVIGATION HELPERS ---------- */
+function getCurrentPageName() {
+    const path = window.location.pathname.split("/").pop();
+    return path && path.length > 0 ? path : "index.html";
+}
+
+function openAuth(mode = "login") {
+    const redirect = encodeURIComponent(getCurrentPageName());
+    window.location.href = `auth.html?mode=${mode}&redirect=${redirect}`;
+}
+
+function openMobileAuth(mode = "login") {
+    closeMobileMenu();
+    openAuth(mode);
+}
+
+/* ---------- USER UI ---------- */
 function updateUserUI(user) {
     const desktopAuth = document.getElementById("desktopAuth");
     const userMenu = document.getElementById("userMenu");
@@ -607,21 +659,30 @@ function updateUserUI(user) {
     const mobileAvatar = document.getElementById("mobileAvatar");
     const mobileUserName = document.getElementById("mobileUserName");
     const mobileUserEmail = document.getElementById("mobileUserEmail");
+
     if (user) {
-        if (desktopAuth) desktopAuth.style.display = "none";
+        // Logged in → hide auth buttons, show profile
+        if (desktopAuth) desktopAuth.style.setProperty("display", "none", "important");
         if (userMenu) userMenu.classList.add("active");
+
         const email = user.email || "User";
-        const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || email.split("@")[0] || "User";
+        const name = user.user_metadata?.full_name
+                  || user.user_metadata?.name
+                  || email.split("@")[0]
+                  || "User";
         const letter = name.charAt(0).toUpperCase();
+
         if (userAvatar) userAvatar.textContent = letter;
         if (profileEmail) profileEmail.textContent = email;
+
         if (mobileAuth) mobileAuth.classList.add("hidden");
         if (mobileUser) mobileUser.classList.add("active");
         if (mobileAvatar) mobileAvatar.textContent = letter;
         if (mobileUserName) mobileUserName.textContent = name;
         if (mobileUserEmail) mobileUserEmail.textContent = email;
     } else {
-        if (desktopAuth) desktopAuth.style.display = "flex";
+        // Logged out → show auth buttons
+        if (desktopAuth) desktopAuth.style.removeProperty("display");
         if (userMenu) userMenu.classList.remove("active");
         if (mobileAuth) mobileAuth.classList.remove("hidden");
         if (mobileUser) mobileUser.classList.remove("active");
@@ -631,21 +692,29 @@ function updateUserUI(user) {
 
 async function checkCurrentUser() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    updateUserUI(session ? session.user : null);
+    updateUserUI(session?.user || null);
 }
 
+// Live updates: login/logout anywhere reflects instantly
 supabaseClient.auth.onAuthStateChange((event, session) => {
-    updateUserUI(session ? session.user : null);
+    updateUserUI(session?.user || null);
 });
 
-checkCurrentUser();
-
+/* ---------- LOGOUT ---------- */
 async function logoutUser() {
+    closeProfileMenu();
+    closeMobileMenu();
     const { error } = await supabaseClient.auth.signOut();
-    if (error) { console.error("Logout error:", error); return; }
+    if (error) {
+        console.error("Logout error:", error);
+        return;
+    }
     updateUserUI(null);
+    // Refresh the page so any protected UI resets cleanly
+    window.location.reload();
 }
 
+/* ---------- PROFILE DROPDOWN ---------- */
 function toggleProfileMenu() {
     const d = document.getElementById("profileDropdown");
     if (d) d.classList.toggle("active");
@@ -654,62 +723,67 @@ function closeProfileMenu() {
     const d = document.getElementById("profileDropdown");
     if (d) d.classList.remove("active");
 }
-function closeMobileMenu() {
-    const m = document.getElementById("mobileMenu");
-    const t = document.getElementById("menuToggle");
-    if (m) m.classList.remove("active");
-    if (t) t.classList.remove("active");
-}
-document.addEventListener("click", function(e) {
-    if (!e.target.closest(".navbar")) {
-        closeMobileMenu();
-        closeProfileMenu();
-    }
-});
 
-function toggleMobileMenu() {
-    const mobileMenu = document.getElementById("mobileMenu");
-    const menuToggle = document.getElementById("menuToggle");
-    if (mobileMenu && menuToggle) {
-        const active = mobileMenu.classList.toggle("active");
-        menuToggle.classList.toggle("active", active);
-    }
-}
-function toggleMobileMenu() {
-    const mobileMenu = document.getElementById("mobileMenu");
-    const menuToggle = document.getElementById("menuToggle");
-    if (mobileMenu && menuToggle) {
-        const active = mobileMenu.classList.toggle("active");
-        menuToggle.classList.toggle("active", active);
-    }
-}
-/* =========================
-   SETTINGS
-========================= */
-
-const overlay = document.getElementById("settingsOverlay");
-
-function openSettings() {
-    overlay.classList.add("active");
-}
-
-function closeSettings() {
-    overlay.classList.remove("active");
-}
-
-overlay.addEventListener("click", function(e) {
-    if (e.target === overlay) {
-        closeSettings();
-    }
-});
-
-
+/* ---------- PREMIUM ---------- */
 function showPremiumComingSoon() {
     closeProfileMenu();
     closeMobileMenu();
     window.location.href = "premium.html";
 }
 
+/* ---------- MOBILE MENU ---------- */
+function toggleMobileMenu() {
+    const m = document.getElementById("mobileMenu");
+    const t = document.getElementById("menuToggle");
+    if (!m || !t) return;
+    const open = m.classList.toggle("active");
+    t.classList.toggle("active", open);
+    t.setAttribute("aria-expanded", String(open));
+}
+function closeMobileMenu() {
+    const m = document.getElementById("mobileMenu");
+    const t = document.getElementById("menuToggle");
+    if (!m || !t) return;
+    m.classList.remove("active");
+    t.classList.remove("active");
+    t.setAttribute("aria-expanded", "false");
+}
+
+/* ---------- SETTINGS MODAL ---------- */
+function openSettings() {
+    const o = document.getElementById("settingsOverlay");
+    if (o) o.classList.add("active");
+}
+function closeSettings() {
+    const o = document.getElementById("settingsOverlay");
+    if (o) o.classList.remove("active");
+}
+
+/* ---------- GLOBAL LISTENERS ---------- */
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".navbar")) {
+        closeMobileMenu();
+        closeProfileMenu();
+    }
+    // Close settings if clicking backdrop
+    const overlay = document.getElementById("settingsOverlay");
+    if (overlay && e.target === overlay) closeSettings();
+});
+
+window.addEventListener("resize", () => {
+    if (window.innerWidth > 950) closeMobileMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        closeSettings();
+        closeMobileMenu();
+        closeProfileMenu();
+    }
+});
+
+/* ---------- INITIALIZE ---------- */
+checkCurrentUser();
 </script>
 
 </body>
